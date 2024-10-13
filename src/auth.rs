@@ -7,7 +7,6 @@ use bcrypt::{hash, verify, DEFAULT_COST};
 use regex::Regex;
 use actix_session::Session;
 
-// User struct to represent a user in the system
 #[derive(FromRow)]
 pub struct User {
     pub user_id: i32,
@@ -16,7 +15,6 @@ pub struct User {
     pub password: String,
 }
 
-// Struct for registration form data
 #[derive(Deserialize)]
 pub struct RegisterFormData {
     pub username: String,
@@ -25,14 +23,12 @@ pub struct RegisterFormData {
     pub password_confirm: String,
 }
 
-// Struct for login form data
 #[derive(Deserialize)]
 pub struct LoginForm {
-    pub identifier: String, // Can be either username or email
+    pub identifier: String,
     pub password: String,
 }
 
-// Show login form
 pub async fn show_login_form(tmpl: web::Data<Tera>, error: Option<String>) -> Result<HttpResponse, Error> {
     let mut ctx = Context::new();
     if let Some(error_message) = error {
@@ -43,12 +39,11 @@ pub async fn show_login_form(tmpl: web::Data<Tera>, error: Option<String>) -> Re
     Ok(HttpResponse::Ok().content_type("text/html").body(rendered))
 }
 
-// Process login form
 pub async fn process_login_form(
     form: web::Form<LoginForm>, 
     pool: web::Data<MySqlPool>, 
     tmpl: web::Data<Tera>, 
-    session: Session // Make sure session is passed in
+    session: Session
 ) -> Result<HttpResponse, Error> {
     let user_record = sqlx::query_as!(
         User,
@@ -71,11 +66,9 @@ pub async fn process_login_form(
         if verify(&form.password, &user.password)
             .map_err(|_| ErrorInternalServerError("Password verification error"))?
         {
-            // Store username in session after successful login
             session.insert("username", &user.username)
                 .map_err(|_| ErrorInternalServerError("Session insertion error"))?;
 
-            // Redirect to dashboard
             return Ok(HttpResponse::SeeOther()
                 .append_header(("Location", "/dashboard"))
                 .finish());
@@ -85,8 +78,6 @@ pub async fn process_login_form(
     show_login_form(tmpl.clone(), Some("Invalid credentials.".to_string())).await
 }
 
-
-// Logout and clear session
 pub async fn logout(session: Session) -> Result<HttpResponse, Error> {
     session.clear();
     Ok(HttpResponse::SeeOther()
@@ -94,7 +85,6 @@ pub async fn logout(session: Session) -> Result<HttpResponse, Error> {
         .finish())
 }
 
-// Show registration form
 pub async fn show_register_form(tmpl: web::Data<Tera>, error_message: Option<String>) -> Result<HttpResponse, Error> {
     let mut ctx = Context::new();
     if let Some(error) = error_message {
@@ -105,13 +95,11 @@ pub async fn show_register_form(tmpl: web::Data<Tera>, error_message: Option<Str
     Ok(HttpResponse::Ok().content_type("text/html").body(rendered))
 }
 
-// Email validation
 fn is_valid_email(email: &str) -> bool {
     let re = Regex::new(r"^[\w\-\.]+@([\w\-]+\.)+[a-zA-Z]{2,}$").unwrap();
     re.is_match(email)
 }
 
-// Process registration form
 pub async fn process_register_form(
     form: web::Form<RegisterFormData>, 
     pool: web::Data<MySqlPool>, 
@@ -168,7 +156,6 @@ pub async fn process_register_form(
         return show_register_form(tmpl.clone(), Some("Email is already registered.".to_string())).await;
     }
 
-    // Hash password and insert user into the database
     let hashed_password = hash(&form.password, DEFAULT_COST)
         .map_err(|_| ErrorInternalServerError("Error hashing password"))?;
     
@@ -188,7 +175,6 @@ pub async fn process_register_form(
     Ok(HttpResponse::SeeOther().append_header(("Location", "/auth/login")).finish())
 }
 
-// Configure routes for authentication
 pub fn configure_routes(cfg: &mut web::ServiceConfig) {
     cfg.service(web::resource("/auth/register")
         .route(web::get().to(show_register_form))
