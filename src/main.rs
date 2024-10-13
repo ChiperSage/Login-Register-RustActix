@@ -1,5 +1,5 @@
 mod auth;
-mod dashboard; // Import the dashboard module
+mod dashboard;
 
 use actix_web::{web, App, HttpResponse, HttpServer, Result, Error};
 use tera::{Tera, Context};
@@ -34,40 +34,36 @@ async fn check_db(pool: web::Data<MySqlPool>) -> Result<HttpResponse, Error> {
 async fn main() -> std::io::Result<()> {
     env_logger::init();
 
-    // Attempt to connect to the database
-    let pool = match MySqlPool::connect("mysql://root:@localhost:3306/rust_auth").await {
+    let pool = match MySqlPool::connect("mysql://root:@localhost:3306/database_name").await {
         Ok(pool) => pool,
         Err(err) => {
             eprintln!("Failed to create pool: {:?}", err);
-            std::process::exit(1); // Exit if the database connection fails
+            std::process::exit(1);
         }
     };
 
-    let secret_key = Key::generate(); // Generate secret key for session
+    let secret_key = Key::generate();
 
-    // Start the HTTP server
     HttpServer::new(move || {
-        // Initialize Tera template engine
         let tera = Tera::new(concat!(env!("CARGO_MANIFEST_DIR"), "/templates/**/*"))
             .unwrap_or_else(|err| {
                 eprintln!("Template initialization error: {:?}", err);
                 std::process::exit(1);
             });
 
-        // App configuration
         App::new()
             .wrap(SessionMiddleware::new(
-                CookieSessionStore::default(), // Use the session store
-                secret_key.clone(), // Provide the secret key for encryption
+                CookieSessionStore::default(), 
+                secret_key.clone(),
             ))
-            .app_data(web::Data::new(tera)) // Templating engine
-            .app_data(web::Data::new(pool.clone())) // Database pool
-            .configure(dashboard::configure_routes) // Configure dashboard routes
-            .configure(auth::configure_routes) // Configure auth routes
-            .route("/", web::get().to(welcome)) // Welcome route
-            .route("/check-db", web::get().to(check_db)) // Check database connection route
+            .app_data(web::Data::new(tera))
+            .app_data(web::Data::new(pool.clone()))
+            .configure(dashboard::configure_routes)
+            .configure(auth::configure_routes)
+            .route("/", web::get().to(welcome))
+            .route("/check-db", web::get().to(check_db))
     })
-    .bind("127.0.0.1:8080")? // Bind server to local address
+    .bind("127.0.0.1:8080")?
     .run()
     .await
 }
