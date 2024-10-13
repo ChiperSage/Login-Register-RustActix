@@ -1,11 +1,13 @@
 mod auth;
+mod dashboard; // Import the dashboard module
 
 use actix_web::{web, App, HttpResponse, HttpServer, Result, Error};
-use tera::Tera;
-use tera::Context;
+use tera::{Tera, Context};
 use sqlx::MySqlPool;
 use log::error;
 use env_logger;
+use actix_session::{SessionMiddleware, storage::CookieSessionStore};
+use actix_web::cookie::Key;
 
 async fn welcome(tmpl: web::Data<Tera>) -> Result<HttpResponse, Error> {
     let s = tmpl
@@ -32,29 +34,40 @@ async fn check_db(pool: web::Data<MySqlPool>) -> Result<HttpResponse, Error> {
 async fn main() -> std::io::Result<()> {
     env_logger::init();
 
-    let pool = MySqlPool::connect("mysql://root:@localhost:3300/ruby_auth")
-        .await
-        .unwrap_or_else(|err| {
+    // Attempt to connect to the database
+    let pool = match MySqlPool::connect("mysql://root:@localhost:3306/rust_auth").await {
+        Ok(pool) => pool,
+        Err(err) => {
             eprintln!("Failed to create pool: {:?}", err);
-            std::process::exit(1);
-        });
+            std::process::exit(1); // Exit if the database connection fails
+        }
+    };
 
+    let secret_key = Key::generate(); // Generate secret key for session
+
+    // Start the HTTP server
     HttpServer::new(move || {
+        // Initialize Tera template engine
         let tera = Tera::new(concat!(env!("CARGO_MANIFEST_DIR"), "/templates/**/*"))
             .unwrap_or_else(|err| {
                 eprintln!("Template initialization error: {:?}", err);
                 std::process::exit(1);
             });
 
+        // App configuration
         App::new()
-            .app_data(web::Data::new(tera))
-            .app_data(web::Data::new(pool.clone()))
-            .route("/", web::get().to(welcome))
-            .configure(auth::configure_routes)
-            .route("/check-db", web::get().to(check_db))
+            .wrap(SessionMiddleware::new(
+                CookieSessionStore::default(), // Use the session store
+                secret_key.clone(), // Provide the secret key for encryption
+            ))
+            .app_data(web::Data::new(tera)) // Templating engine
+            .app_data(web::Data::new(pool.clone())) // Database pool
+            .configure(dashboard::configure_routes) // Configure dashboard routes
+            .configure(auth::configure_routes) // Configure auth routes
+            .route("/", web::get().to(welcome)) // Welcome route
+            .route("/check-db", web::get().to(check_db)) // Check database connection route
     })
-    .bind("127.0.0.1:8080")?
+    .bind("127.0.0.1:8080")? // Bind server to local address
     .run()
     .await
 }
-
