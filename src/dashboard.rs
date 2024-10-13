@@ -7,7 +7,7 @@ pub async fn show_dashboard(session: Session, tmpl: web::Data<Tera>) -> Result<H
     if let Some(username) = session.get::<String>("username").unwrap_or(None) {
         let mut ctx = Context::new();
         ctx.insert("username", &username);
-        ctx.insert("welcome_message", &format!("Welcome to your dashboard, {}!", username)); // Add this line
+        ctx.insert("welcome_message", &format!("Welcome to your dashboard, {}!", username));
         
         let s = tmpl.render("dashboard.html", &ctx)
             .map_err(|err| {
