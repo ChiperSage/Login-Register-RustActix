@@ -16,3 +16,6 @@ This is a Rust web application built using the Actix framework that allows users
 - **Database**: MySQL
 - **Templating Engine**: Tera
 - **Logger**: Log
+
+Cargo build
+Cargo run
