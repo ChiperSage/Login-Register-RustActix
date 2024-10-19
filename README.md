@@ -17,5 +17,7 @@ This is a Rust web application built using the Actix framework that allows users
 - **Templating Engine**: Tera
 - **Logger**: Log
 
+## Run
+
 - cargo build
 - cargo run
